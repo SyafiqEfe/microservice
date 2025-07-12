@@ -1,63 +1,93 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <title>Microservice | Car Project</title>
-
-    <meta name="description" content="Source code generated using layoutit.com">
-    <meta name="author" content="LayoutIt!">
-
-    <link href="../static/css/bootstrap.min.css" rel="stylesheet">
-    <link href="../static/css/style.css" rel="stylesheet">
-
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Update Car | {{ servermana }}</title>
+    <meta
+      name="description"
+      content="Source code generated using layoutit.com"
+    />
+    <meta name="author" content="LayoutIt!" />
+    <link
+      href="{{ request.url_for('static', path='/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ request.url_for('static', path='/css/style.css') }}"
+      rel="stylesheet"
+    />
   </head>
   <body>
-
-  <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-12">
-                <h1>Microservice | Car Project</h1>
-                <h3>Demo:
-                        <a href="{{url_for('createcar',ms=servermana)}}">Create</a>
-                        /
-                        <a href="{{url_for('readcar',ms=servermana)}}">Read</a>
-                        /
-                        <!-- Tombol Update/Delete di header dihapus, tidak perlu di halaman update -->
-                        <a href="{{url_for('searchcar')}}">Search</a>
-                </h3> 
-            </div>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-md-12">
+          <h1>Microservice | Car Project</h1>
+          <h3>
+            <a
+              href="{{ request.url_for('get_service_page', service_num=servermana[-1]) }}"
+              >← Back to {{ servermana }}</a
+            >
+          </h3>
         </div>
-        <div class="row">
-            <div class="col-md-12">
-                <h4>Update Car Data</h4>
-                <form method="POST">
-                    <input type="hidden" name="car_id" value="{{ car['id'] if car and 'id' in car else '' }}">
-                    <div class="form-group">
-                        <label>Car Name</label>
-                        <input type="text" class="form-control" name="carName" value="{{ car['carname'] if car and 'carname' in car else '' }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Car Brand</label>
-                        <input type="text" class="form-control" name="carBrand" value="{{ car['carbrand'] if car and 'carbrand' in car else '' }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Car Model</label>
-                        <input type="text" class="form-control" name="carModel" value="{{ car['carmodel'] if car and 'carmodel' in car else '' }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Car Price</label>
-                        <input type="number" class="form-control" name="carPrice" value="{{ car['carprice'] if car and 'carprice' in car else '' }}" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Update</button>
-                </form>
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+          <h4>Update Car Data in {{ servermana }}</h4>
+          <!-- PERBAIKAN: Form action menunjuk ke rute update yang benar -->
+          <form
+            method="POST"
+            action="{{ request.url_for('handle_update_car_form', ms=servermana, car_id=car.id) }}"
+          >
+            <div class="form-group">
+              <label>Car Name</label>
+              <input
+                type="text"
+                class="form-control"
+                name="carName"
+                value="{{ car.carname }}"
+                required
+              />
             </div>
+            <div class="form-group">
+              <label>Car Brand</label>
+              <input
+                type="text"
+                class="form-control"
+                name="carBrand"
+                value="{{ car.carbrand }}"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>Car Model</label>
+              <input
+                type="text"
+                class="form-control"
+                name="carModel"
+                value="{{ car.carmodel }}"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>Car Price</label>
+              <input
+                type="number"
+                step="0.01"
+                class="form-control"
+                name="carPrice"
+                value="{{ car.carprice }}"
+                required
+              />
+            </div>
+            <button type="submit" class="btn btn-primary">Update</button>
+          </form>
         </div>
-  </div>
-    <script src="../static/js/jquery.min.js"></script>
-    <script src="../static/js/bootstrap.min.js"></script>
-    <script src="../static/js/scripts.js"></script>
+      </div>
+    </div>
+    <script src="{{ request.url_for('static', path='/js/jquery.min.js') }}"></script>
+    <script src="{{ request.url_for('static', path='/js/bootstrap.min.js') }}"></script>
+    <script src="{{ request.url_for('static', path='/js/scripts.js') }}"></script>
   </body>
 </html>

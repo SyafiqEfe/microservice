@@ -1,153 +1,108 @@
-from flask import Flask, jsonify
+import uvicorn
+from fastapi import FastAPI, HTTPException, status
+from pydantic import BaseModel
 from peewee import *
-from flask_restful import Resource, Api, reqparse 
+from typing import List
 
+# --- 1. Konfigurasi Database (PERBEDAAN: Menggunakan DB-B) ---
+db = SqliteDatabase('../DB-B.db')
 
-app = Flask(__name__)
-api = Api(app)
-
-db = SqliteDatabase('DB-B.db')
-
-class BaseModel(Model):
+class BaseModelDB(Model):
     class Meta:
         database = db
 
-class TBCarsWeb(BaseModel):
+class TBCarsWeb(BaseModelDB):
     carname = TextField()
-    carbrand = TextField() 
+    carbrand = TextField()
     carmodel = TextField()
     carprice = TextField()
     description = TextField()
 
 def create_tables():
     with db:
-        db.create_tables([TBCarsWeb])
+        db.create_tables([TBCarsWeb], safe=True)
 
-@app.route('/')
-def masukkeindeks():
-    return "MS3 Server Ready"
+# --- 2. Pydantic Models (Sama seperti MS1) ---
+class CarCreate(BaseModel):
+    carname: str
+    carbrand: str
+    carmodel: str
+    carprice: str
+    description: str
 
-class CAR(Resource):
-    def get(self):
-        rows = TBCarsWeb.select()    
-        datas=[]
+class Car(CarCreate):
+    id: int
 
-        for row in rows:
-            datas.append({
-            'id':row.id,
-            'carname':row.carname,
-            'carbrand':row.carbrand,
-            'carmodel':row.carmodel,
-            'carprice':row.carprice,
-            'description':row.description
-        })
-        return jsonify(datas)
+# --- 3. Inisialisasi Aplikasi FastAPI ---
+app = FastAPI(
+    title="Microservice 3 API",
+    description="API untuk mengelola data mobil di Database B.",
+    version="1.0.0"
+)
 
-    def post(self):
-        parserData = reqparse.RequestParser()
-        parserData.add_argument('carname')
-        parserData.add_argument('carbrand')
-        parserData.add_argument('carmodel')
-        parserData.add_argument('carprice')
-        parserData.add_argument('description')
+# --- 4. Event Handler (Sama seperti MS1) ---
+@app.on_event("startup")
+def startup():
+    if db.is_closed():
+        db.connect()
 
-        parserAmbilData = parserData.parse_args()
+@app.on_event("shutdown")
+def shutdown():
+    if not db.is_closed():
+        db.close()
 
-        fName = parserAmbilData.get('carname')
-        fBrand = parserAmbilData.get('carbrand')
-        fModel = parserAmbilData.get('carmodel')
-        fPrice = parserAmbilData.get('carprice')
-        fDescription = parserAmbilData.get('description')
+# --- 5. Endpoints API (Logika sama persis dengan MS1) ---
 
-        car_simpan = TBCarsWeb.create(
-            carname = fName,
-            carbrand = fBrand, 
-            carmodel = fModel,
-            carprice = fPrice,
-            description = fDescription
-            )
+@app.get("/", summary="Cek Status Server")
+def root():
+    return {"message": "MS3 Server (FastAPI) is Ready"}
 
-        rows = TBCarsWeb.select()    
-        datas=[]
-        for row in rows:
-            datas.append({
-                'id':row.id,
-                'carname':row.carname,
-                'carbrand':row.carbrand,
-                'carmodel':row.carmodel,
-                'carprice':row.carprice,
-                'description':row.description
-            })
-        return jsonify(datas)
+@app.get("/cars", response_model=List[Car], summary="Ambil Semua Data Mobil")
+def get_all_cars():
+    cars = TBCarsWeb.select()
+    return [car for car in cars.dicts()]
 
-api.add_resource(CAR, '/cars', endpoint="cars")
+@app.post("/cars", response_model=Car, status_code=status.HTTP_201_CREATED, summary="Tambah Mobil Baru")
+def create_car(car: CarCreate):
+    new_car = TBCarsWeb.create(**car.dict())
+    return new_car.__data__
 
-class CAR_ID(Resource):
-    def get(self, id):
-        try:
-            car = TBCarsWeb.get(TBCarsWeb.id == id)
-            return jsonify({
-                'id': car.id,
-                'carname': car.carname,
-                'carbrand': car.carbrand,
-                'carmodel': car.carmodel,
-                'carprice': car.carprice,
-                'description': car.description
-            })
-        except TBCarsWeb.DoesNotExist:
-            return jsonify({'error': 'Not found'}), 404
+@app.get("/cars/{car_id}", response_model=Car, summary="Ambil Mobil Berdasarkan ID")
+def get_car_by_id(car_id: int):
+    try:
+        car = TBCarsWeb.get_by_id(car_id)
+        return car.__data__
+    except DoesNotExist:
+        raise HTTPException(status_code=404, detail="Car not found")
 
-    def put(self, id):
-        parserData = reqparse.RequestParser()
-        parserData.add_argument('carname')
-        parserData.add_argument('carbrand')
-        parserData.add_argument('carmodel')
-        parserData.add_argument('carprice')
-        parserData.add_argument('description')
-        parserAmbilData = parserData.parse_args()
-        query = TBCarsWeb.update(
-            carname=parserAmbilData.get('carname'),
-            carbrand=parserAmbilData.get('carbrand'),
-            carmodel=parserAmbilData.get('carmodel'),
-            carprice=parserAmbilData.get('carprice'),
-            description=parserAmbilData.get('description')
-        ).where(TBCarsWeb.id == id)
+@app.put("/cars/{car_id}", response_model=Car, summary="Update Data Mobil")
+def update_car(car_id: int, car_data: CarCreate):
+    try:
+        query = TBCarsWeb.update(**car_data.dict()).where(TBCarsWeb.id == car_id)
         query.execute()
-        return jsonify({'status': 'updated'})
+        return get_car_by_id(car_id)
+    except DoesNotExist:
+        raise HTTPException(status_code=404, detail="Car not found")
 
-    def delete(self, id):
-        query = TBCarsWeb.delete().where(TBCarsWeb.id == id)
-        query.execute()
-        return jsonify({'status': 'deleted'})
+@app.delete("/cars/{car_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Hapus Mobil")
+def delete_car(car_id: int):
+    try:
+        car_to_delete = TBCarsWeb.get_by_id(car_id)
+        car_to_delete.delete_instance()
+    except DoesNotExist:
+        raise HTTPException(status_code=404, detail="Car not found")
 
-api.add_resource(CAR_ID, '/cars/<int:id>')
+@app.get("/cars/search/{keyword}", response_model=List[Car], summary="Cari Mobil Berdasarkan Keyword")
+def search_car(keyword: str):
+    cars = TBCarsWeb.select().where(
+        (TBCarsWeb.carname.contains(keyword)) |
+        (TBCarsWeb.carbrand.contains(keyword)) |
+        (TBCarsWeb.carmodel.contains(keyword))
+    )
+    return [car for car in cars.dicts()]
 
-class CAR_SEARCH(Resource):
-    def get(self, keyword):
-        rows = TBCarsWeb.select().where(
-            (TBCarsWeb.carname.contains(keyword)) |
-            (TBCarsWeb.carbrand.contains(keyword)) |
-            (TBCarsWeb.carmodel.contains(keyword))
-        )
-        datas = []
-        for row in rows:
-            datas.append({
-                'id': row.id,
-                'carname': row.carname,
-                'carbrand': row.carbrand,
-                'carmodel': row.carmodel,
-                'carprice': row.carprice,
-                'description': row.description
-            })
-        return jsonify(datas)
-
-api.add_resource(CAR_SEARCH, '/cars/search/<string:keyword>')
-
-
+# --- 6. Menjalankan Aplikasi ---
 if __name__ == '__main__':
     create_tables()
-    app.run(
-        host = '0.0.0.0',
-        debug = 'True',
-        port=5053
-        )
+    # PERBEDAAN: Jalankan di port 5053 dan panggil file ms3
+    uvicorn.run("ms3:app", host="0.0.0.0", port=5053, reload=True)
